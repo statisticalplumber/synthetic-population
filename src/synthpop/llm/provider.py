@@ -7,11 +7,20 @@ credentials come exclusively from environment variables.
 - ``MockProvider``: deterministic, offline, schema-aware. Used for
   development, tests, and CI. Clearly labeled; never presented as a real LLM.
 - ``OpenAICompatibleProvider``: any OpenAI-compatible /v1 endpoint
-  (LM Studio, llama-server, vLLM, hosted APIs).
+  (LM Studio, llama-server, vLLM, hosted APIs). Sync (httpx) and async
+  (httpx.AsyncClient) paths; all merged inference params (temperature,
+  max_tokens, top_p, ...) are forwarded to the endpoint.
+
+Error taxonomy (for retry classification in the batch runner):
+- ``RetryableLLMError``: timeouts, connection failures, 408/429/5xx,
+  transient malformed output. Safe to retry with backoff.
+- ``NonRetryableLLMError``: 401/403 (auth), 404 (endpoint), 400/other 4xx
+  (invalid schema/config, unsupported model). Retrying is pointless.
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
@@ -24,6 +33,40 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..models.config import PopulationConfig  # noqa: F401  (re-export convenience)
 
 
+# ---------------------------------------------------------------------------
+# error taxonomy
+# ---------------------------------------------------------------------------
+
+
+class LLMError(ValueError):
+    """Base class for provider errors (ValueError for back-compat)."""
+
+
+class RetryableLLMError(LLMError):
+    """Transient failure: safe to retry with backoff."""
+
+
+class NonRetryableLLMError(LLMError):
+    """Permanent failure: retrying will not help (auth, bad endpoint, ...)."""
+
+
+def classify_http_status(status_code: int) -> type[LLMError]:
+    """Map an HTTP status code to an error class (retryability)."""
+    if status_code in (408, 429) or 500 <= status_code < 600:
+        return RetryableLLMError
+    return NonRetryableLLMError
+
+
+def classify_transport_error() -> type[LLMError]:
+    """Transport-level failures (timeout, connect error) are retryable."""
+    return RetryableLLMError
+
+
+# ---------------------------------------------------------------------------
+# structured response
+# ---------------------------------------------------------------------------
+
+
 class StructuredResponse(BaseModel):
     """Result of one structured generation call."""
 
@@ -34,6 +77,54 @@ class StructuredResponse(BaseModel):
     model: str
     prompt_tokens: int = 0
     completion_tokens: int = 0
+
+
+# ---------------------------------------------------------------------------
+# JSON schema preparation (nested-schema safe)
+# ---------------------------------------------------------------------------
+
+
+def inline_local_refs(schema: dict) -> dict:
+    """Replace local ``$ref`` pointers (``#/$defs/...``) with the referenced
+    definition, inlining recursively.
+
+    This is the safe alternative to dropping ``$defs``: a schema with nested
+    pydantic models contains ``$ref``s that would dangle if ``$defs`` were
+    removed. Inlining keeps the schema valid and self-contained.
+    """
+    def resolve(node: Any) -> Any:
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str) and ref.startswith("#/"):
+                target = schema
+                for part in ref[2:].split("/"):
+                    target = target[part]
+                # resolve the definition, but keep any local overrides
+                merged = {**resolve(target), **{k: v for k, v in node.items() if k != "$ref"}}
+                return resolve(merged)
+            return {k: resolve(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [resolve(v) for v in node]
+        return node
+
+    return resolve(schema)
+
+
+def prepare_prompt_schema(schema: Type[BaseModel]) -> dict:
+    """JSON schema for prompt embedding / json_schema response_format.
+
+    Inlines local ``$ref``s and drops the now-unnecessary ``$defs`` so no
+    dangling references remain.
+    """
+    schema_json = schema.model_json_schema()
+    schema_json = inline_local_refs(schema_json)
+    schema_json.pop("$defs", None)
+    return schema_json
+
+
+# ---------------------------------------------------------------------------
+# provider interface
+# ---------------------------------------------------------------------------
 
 
 class LLMProvider(ABC):
@@ -51,6 +142,28 @@ class LLMProvider(ABC):
         params: dict[str, Any] | None = None,
     ) -> StructuredResponse:
         """Generate a JSON object conforming to `schema` and return it parsed."""
+
+    async def acomplete_structured(
+        self,
+        *,
+        system: str,
+        user: str,
+        schema: Type[BaseModel],
+        params: dict[str, Any] | None = None,
+    ) -> StructuredResponse:
+        """Async generation. Default: run the sync path in a worker thread."""
+        return await asyncio.to_thread(
+            self.complete_structured,
+            system=system, user=user, schema=schema, params=params,
+        )
+
+    async def aclose(self) -> None:
+        """Release async resources (async HTTP client). Default: no-op."""
+
+
+# ---------------------------------------------------------------------------
+# mock provider
+# ---------------------------------------------------------------------------
 
 
 class MockProvider(LLMProvider):
@@ -121,11 +234,17 @@ class MockProvider(LLMProvider):
         return None
 
 
+# ---------------------------------------------------------------------------
+# JSON extraction
+# ---------------------------------------------------------------------------
+
+
 def extract_json_object(raw: str) -> dict[str, Any]:
     """Extract a JSON object from model output.
 
     Tolerates markdown code fences and leading/trailing prose: finds the
-    first balanced top-level object. Raises ValueError if none parses.
+    first balanced top-level object. Raises RetryableLLMError if none parses
+    (transient malformed output — a retry may fix it).
     """
     text = raw.strip()
     # strip a single markdown fence if present
@@ -160,7 +279,12 @@ def extract_json_object(raw: str) -> dict[str, Any]:
                         pass
                     break
         start = text.find("{", start + 1)
-    raise ValueError(f"no JSON object found in model output: {raw[:200]!r}")
+    raise RetryableLLMError(f"no JSON object found in model output: {raw[:200]!r}")
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible provider
+# ---------------------------------------------------------------------------
 
 
 class OpenAICompatibleProvider(LLMProvider):
@@ -176,6 +300,9 @@ class OpenAICompatibleProvider(LLMProvider):
     - "none":         no response_format; prompt-only.
     In all cases the JSON schema is embedded in the system prompt and the
     output is validated with pydantic — validation is the real gate.
+
+    All merged inference params (``default_params`` overridden by per-call
+    ``params``) are forwarded to the endpoint — including ``max_tokens``.
     """
 
     def __init__(
@@ -187,6 +314,7 @@ class OpenAICompatibleProvider(LLMProvider):
         timeout_s: float = 120.0,
         default_params: dict[str, Any] | None = None,
         response_format: str = "json_object",
+        transport: httpx.BaseTransport | None = None,
     ):
         if response_format not in ("none", "json_object", "json_schema"):
             raise ValueError(f"invalid response_format: {response_format!r}")
@@ -197,36 +325,52 @@ class OpenAICompatibleProvider(LLMProvider):
         self.timeout_s = timeout_s
         self.default_params = default_params or {}
         self.response_format = response_format
+        self._transport = transport
+        self._async_client: httpx.AsyncClient | None = None
 
-    def complete_structured(
-        self,
-        *,
-        system: str,
-        user: str,
-        schema: Type[BaseModel],
-        params: dict[str, Any] | None = None,
-    ) -> StructuredResponse:
+    # -- request building (shared by sync/async) -----------------------------
+
+    def _headers(self) -> dict[str, str]:
         api_key = os.environ.get(self.api_key_env, "")
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+        return headers
 
-        schema_json = schema.model_json_schema()
-        schema_json.pop("$defs", None)  # keep the prompt compact
+    def _merged_params(self, params: dict[str, Any] | None) -> dict[str, Any]:
+        merged = dict(self.default_params)
+        if params:
+            merged.update(params)
+        return merged
+
+    def _build_payload(
+        self,
+        system: str,
+        user: str,
+        schema: Type[BaseModel],
+        params: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        schema_json = prepare_prompt_schema(schema)
         system_full = (
             f"{system}\n\nRespond with a single JSON object (no prose, no markdown) "
             f"conforming exactly to this JSON schema:\n"
             f"{json.dumps(schema_json, ensure_ascii=False)}"
         )
 
+        merged = self._merged_params(params)
         payload: dict[str, Any] = {
             "model": self.model,
-            "temperature": (params or self.default_params).get("temperature", 0.2),
             "messages": [
                 {"role": "system", "content": system_full},
                 {"role": "user", "content": user},
             ],
         }
+        # forward ALL inference params (temperature, max_tokens, top_p, ...)
+        for key in ("temperature", "max_tokens", "top_p", "frequency_penalty",
+                    "presence_penalty", "top_k", "repetition_penalty"):
+            if key in merged:
+                payload[key] = merged[key]
+
         if self.response_format == "json_object":
             payload["response_format"] = {"type": "json_object"}
         elif self.response_format == "json_schema":
@@ -234,15 +378,11 @@ class OpenAICompatibleProvider(LLMProvider):
                 "type": "json_schema",
                 "json_schema": {"name": schema.__name__, "schema": schema_json},
             }
+        return payload
 
-        resp = httpx.post(
-            f"{self.base_url}/chat/completions",
-            json=payload,
-            headers=headers,
-            timeout=self.timeout_s,
-        )
-        resp.raise_for_status()
-        body = resp.json()
+    def _parse_response(
+        self, body: dict[str, Any], schema: Type[BaseModel]
+    ) -> StructuredResponse:
         raw = body["choices"][0]["message"]["content"]
         obj = extract_json_object(raw)
         validated = schema.model_validate(obj)  # the real conformance gate
@@ -254,6 +394,91 @@ class OpenAICompatibleProvider(LLMProvider):
             prompt_tokens=usage.get("prompt_tokens", 0),
             completion_tokens=usage.get("completion_tokens", 0),
         )
+
+    # -- sync path ------------------------------------------------------------
+
+    def complete_structured(
+        self,
+        *,
+        system: str,
+        user: str,
+        schema: Type[BaseModel],
+        params: dict[str, Any] | None = None,
+    ) -> StructuredResponse:
+        payload = self._build_payload(system, user, schema, params)
+        try:
+            with httpx.Client(
+                base_url=self.base_url,
+                transport=self._transport,  # None => real network
+                timeout=self.timeout_s,
+            ) as client:
+                resp = client.post(
+                    "/chat/completions", json=payload, headers=self._headers()
+                )
+        except httpx.TimeoutException as e:
+            raise RetryableLLMError(f"timeout: {e}") from e
+        except httpx.TransportError as e:
+            raise classify_transport_error()(f"transport error: {e}") from e
+
+        if resp.status_code != 200:
+            raise classify_http_status(resp.status_code)(
+                f"HTTP {resp.status_code}: {resp.text[:300]}"
+            )
+        try:
+            body = resp.json()
+            return self._parse_response(body, schema)
+        except (KeyError, TypeError, RetryableLLMError) as e:
+            raise RetryableLLMError(f"malformed response body: {e}") from e
+
+    # -- async path -----------------------------------------------------------
+
+    def _get_async_client(self) -> httpx.AsyncClient:
+        if self._async_client is None or self._async_client.is_closed:
+            self._async_client = httpx.AsyncClient(
+                base_url=self.base_url,
+                transport=self._transport,
+                timeout=self.timeout_s,
+            )
+        return self._async_client
+
+    async def acomplete_structured(
+        self,
+        *,
+        system: str,
+        user: str,
+        schema: Type[BaseModel],
+        params: dict[str, Any] | None = None,
+    ) -> StructuredResponse:
+        payload = self._build_payload(system, user, schema, params)
+        client = self._get_async_client()
+        try:
+            resp = await client.post(
+                "/chat/completions", json=payload, headers=self._headers()
+            )
+        except httpx.TimeoutException as e:
+            raise RetryableLLMError(f"timeout: {e}") from e
+        except httpx.TransportError as e:
+            raise classify_transport_error()(f"transport error: {e}") from e
+
+        if resp.status_code != 200:
+            raise classify_http_status(resp.status_code)(
+                f"HTTP {resp.status_code}: {resp.text[:300]}"
+            )
+        try:
+            body = resp.json()
+            return self._parse_response(body, schema)
+        except (KeyError, TypeError, RetryableLLMError) as e:
+            raise RetryableLLMError(f"malformed response body: {e}") from e
+
+    async def aclose(self) -> None:
+        if self._async_client is not None and not self._async_client.is_closed:
+            await self._async_client.aclose()
+        self._async_client = None
+
+
+# ---------------------------------------------------------------------------
+# response_format probing
+# ---------------------------------------------------------------------------
 
 
 def probe_response_format(
@@ -290,6 +515,11 @@ def probe_response_format(
             return "json_object"
         return "none"
     return "json_object"  # server accepted everything; assume at least json_object
+
+
+# ---------------------------------------------------------------------------
+# factory
+# ---------------------------------------------------------------------------
 
 
 def build_provider(role: str, models_config: dict[str, Any]) -> LLMProvider:

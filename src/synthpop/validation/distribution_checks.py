@@ -133,18 +133,34 @@ def check_age_mixture(name: str, spec: AgeMixtureSpec, rows: list[dict],
     return _compare_table(target, counts, n, thresholds, name, "age_bins")
 
 
+# Explicit demographic fields — mirrors PersonaSkeleton.demographic_key().
+# persona_id and provenance must NOT affect duplicate detection: two records
+# with identical demographics are duplicates even if their provenance
+# (seed, created_at, ...) or persona_id differs.
+_DEMOGRAPHIC_FIELDS = (
+    "country", "emirate", "city", "urban_rural", "age", "age_band", "gender",
+    "marital_status", "education", "employment_status", "occupation_group",
+    "income_band", "household_size", "housing_status",
+)
+
+
 def duplicate_and_missing_rates(rows: list[dict]) -> tuple[float, float]:
+    """Duplicate rate over demographic fields only (see _DEMOGRAPHIC_FIELDS).
+
+    Provenance and persona_id are deliberately excluded: they are record
+    metadata, not demographic content.
+    """
     n = len(rows)
     if n == 0:
         return 0.0, 0.0
-    keys = [tuple(sorted((k, str(v)) for k, v in r.items() if k != "persona_id")) for r in rows]
+    keys = [tuple(r.get(f) for f in _DEMOGRAPHIC_FIELDS) for r in rows]
     dup_rate = 1.0 - len(set(keys)) / n
     missing = sum(
         1 for r in rows
-        for v in r.values()
-        if v is None or (isinstance(v, str) and v == "")
+        for f in _DEMOGRAPHIC_FIELDS
+        if r.get(f) is None or (isinstance(r.get(f), str) and r.get(f) == "")
     )
-    total_cells = sum(len(r) for r in rows)
+    total_cells = n * len(_DEMOGRAPHIC_FIELDS)
     return dup_rate, missing / total_cells
 
 

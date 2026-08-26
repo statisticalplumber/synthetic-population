@@ -78,9 +78,26 @@ def test_scenario_basic():
             "category": "consumer",
             "question": "Would you subscribe to grocery delivery for AED 39/month?",
             "options": ["yes", "no", "maybe"],
+            "price": 39.0,
+            "currency": "AED",
+            "tags": ["subscription", "grocery"],
         }
     )
-    assert sc.version == "v1"
+    assert sc.scenario_version == "v1"
+    assert sc.full_id() == "grocery_subscription_v1@v1"
+    assert sc.price == 39.0
+    assert sc.currency == "AED"
+    assert sc.tags == ["subscription", "grocery"]
+
+
+def test_scenario_bad_currency():
+    with pytest.raises(ValidationError):
+        Scenario.model_validate(
+            {
+                "scenario_id": "x", "question": "q", "options": ["a"],
+                "currency": "aed123",
+            }
+        )
 
 
 def test_scenario_duplicate_options():
@@ -92,7 +109,8 @@ def test_scenario_duplicate_options():
 
 def sim_provenance() -> SimulationProvenance:
     return SimulationProvenance(
-        provider="mock", model=None, simulator_prompt_version="sim_v1",
+        provider="mock", model="mock/deterministic",
+        simulator_prompt_version="sim_v1",
         scenario_id="grocery_subscription_v1", scenario_version="v1",
         persona_version="abc", seed=1,
     )
@@ -107,11 +125,34 @@ def test_simulation_result_ok():
             "choice": "yes",
             "probabilities": {"yes": 0.52, "no": 0.31, "maybe": 0.17},
             "confidence": 0.68,
-            "behavioral_factors": ["price sensitivity", "convenience preference"],
+            "behavioral_factors": [
+                {"factor": "price_sensitivity", "direction": "positive", "strength": 0.6},
+                {"factor": "convenience_preference", "direction": "neutral", "strength": 0.1},
+            ],
             "provenance": sim_provenance(),
         }
     )
     assert r.choice == "yes"
+    assert r.behavioral_factors[0].factor == "price_sensitivity"
+    assert r.behavioral_factors[0].strength == 0.6
+
+
+def test_simulation_result_unknown_factor_rejected():
+    with pytest.raises(ValidationError):
+        SimulationResult.model_validate(
+            {
+                "persona_id": "AE_000001",
+                "scenario_id": "grocery_subscription_v1",
+                "scenario_version": "v1",
+                "choice": "yes",
+                "probabilities": {"yes": 0.5, "no": 0.3, "maybe": 0.2},
+                "confidence": 0.68,
+                "behavioral_factors": [
+                    {"factor": "not_a_latent", "direction": "positive", "strength": 0.6},
+                ],
+                "provenance": sim_provenance(),
+            }
+        )
 
 
 def test_simulation_probability_sum():

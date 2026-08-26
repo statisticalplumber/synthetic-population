@@ -9,6 +9,11 @@ enrichment:
   role: mock         # mock | luna | terra | sol  (see config/models.yaml)
   max_retries: 3
 
+# Layer 3 — behavioral scenario simulation (scripts/simulate.py)
+simulation:
+  concurrency: 8
+  max_retries: 3
+
 distribution_checks:
   # pass/fail = chi-squared goodness-of-fit vs target (sample-size aware)
   alpha: 0.01

@@ -131,12 +131,82 @@ the mock; e.g. trust_propensity 0.55–0.78). Watch latent-variable variance
 as a quality metric; consider prompt tuning or post-hoc rescaling before
 using these for simulation.
 
+## Layer 3: behavioral scenario simulation (MVP)
+
+Simulates (persona, scenario) pairs through a configured provider role and
+emits probabilistic `SimulationResult` records: a full probability
+distribution over the scenario options, a confidence score, and up to 3
+declared behavioral factors (known latent label + direction + strength —
+**not** chain-of-thought reasoning). Every record carries full provenance
+(provider, model, prompt version, scenario id/version, persona version,
+inference params, seed, `created_at`, `data_label`).
+
+```bash
+# offline mock (deterministic, no API key)
+make simulate PERSONAS=data/generated/personas/ae_uae_mock_v1_n1000_s42 ROLE=mock
+
+# real provider (async, bounded concurrency)
+ROLE=luna make simulate PERSONAS=data/generated/personas/ae_uae_mock_v1_n1000_s42
+```
+
+- `scripts/simulate.py` — CLI: `--personas --scenarios --role --out --limit
+  --concurrency --max-retries --seed [--sync]` (concurrency/retries also from
+  `config/generation.yaml: simulation:`).
+- **Checkpoint/resume**: results are appended to
+  `data/generated/simulations/<run_id>/simulations.jsonl` as each pair
+  completes; re-running the same command resumes (idempotent by
+  `persona_id|scenario_id@scenario_version`).
+- **Deterministic validation** (Python, not LLM): option keys must match the
+  scenario exactly, probabilities in [0,1] summing to ~1 (tol 0.01),
+  confidence in [0,1], factors must be known persona latents with strength
+  in [0,1]. Invalid output is retried as a transient failure.
+- **Error classification**: timeouts, connect errors, 408/429/5xx and
+  malformed output are retryable (exponential backoff + jitter); 400/401/403/
+  404 fail immediately (config/auth problems, not worth retrying).
+- **Metrics** (`metrics.json`): prob-sum failure rate, confidence
+  distribution, option selection per scenario, probability entropy,
+  persona/scenario response diversity, retry/failure/cost accounting.
+- **Ensemble-ready**: one record = one model's prediction;
+  `SimulationResult.ensemble_key()` groups identical (persona, scenario)
+  predictions for mean/variance/disagreement aggregation (agreement is not
+  ground truth).
+
+### Issues to close before the first real Luna/Terra simulation
+
+1. **Latent variance compression** (observed on gemma-4-12b-it enrichment):
+   real-model latents compress toward the middle (std ~0.06–0.22 vs ~0.29
+   mock). Simulations driven by such latents may be under-dispersed. Add
+   per-variable latent variance checks to the pre-flight; prompt-tune or
+   post-hoc rescale before trusting real-model simulation output.
+2. **`response_format` capability varies by server** — probe, don't assume.
+   The known local llama-server build accepts only `text`/`json_object`
+   (`json_schema` silently ignored). Keep roles on `json_object` until the
+   target server is probed; the pydantic validation gate is the real
+   conformance check either way.
+3. **Truncation vs `max_tokens`**: truncated JSON is extracted as a
+   retryable failure; with a too-small `max_tokens` that becomes a permanent
+   retry loop. Simulation outputs are small (~200–400 tokens); the default
+   2048 is ample, but verify per role.
+4. **Concurrency vs local-server workers**: llama-server is effectively
+   single-flight by default; client-side `concurrency: 8` still holds 8
+   in-flight HTTP connections. Tune `simulation.concurrency` to the server's
+   actual worker count for real runs.
+5. **Resume + metrics semantics**: on a resumed run, `metrics.json` batch/
+   cost stats reflect that run's *incremental* batch, while distribution
+   metrics cover the full stored set. For the first real run, either run to
+   completion in one pass or recompute from the full JSONL.
+6. **Costs**: mock token counts are estimates (`len//4`); real runs use the
+   server `usage` field. Set `pricing_usd_per_1k` for the role before a
+   paid run so `estimated_cost_usd` is meaningful.
+
 ## Status / next
 
 - [x] Schemas, sampler, validation, storage, metrics, tests, E2E
 - [x] Mock enrichment (deterministic, offline)
 - [x] Real LLM enrichment path verified (12B local model, 50-persona smoke)
+- [x] Scenario simulation MVP (schemas, prompts, deterministic validation,
+      retries/checkpoint, mock path, 10-persona demo, metrics)
 - [ ] Full 1,000-persona real-model enrichment run
-- [ ] Scenario simulation (schema + ensemble prediction models ready)
+- [ ] First real Luna/Terra simulation run (see README: issues to close first)
 - [ ] Bias/stereotype audit metrics
 - [ ] Fine-tuning dataset export (HF format)

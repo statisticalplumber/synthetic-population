@@ -1,0 +1,73 @@
+# =============================================================================
+# Synthetic example scenarios (Layer 3 test dataset).
+#
+# Clearly synthetic consumer-style scenarios for pipeline development and
+# mock runs. The Scenario model itself is generic (category is free-form,
+# price/currency/tags are optional) — nothing here is hardcoded into the
+# model layer.
+# =============================================================================
+scenarios:
+  - scenario_id: grocery_subscription
+    scenario_version: v1
+    category: consumer
+    question: "Would you subscribe to a weekly grocery delivery service for AED 39 per month?"
+    description: "A recurring grocery delivery subscription with flexible cancellation."
+    options: [subscribe, maybe, decline]
+    price: 39.0
+    currency: AED
+    context:
+      frequency: weekly
+      cancellation: any_time
+    tags: [subscription, grocery, recurring]
+
+  - scenario_id: premium_smartphone_purchase
+    scenario_version: v1
+    category: consumer
+    question: "Would you buy a premium smartphone at AED 5,499 (latest flagship)?"
+    description: "One-time purchase of a top-tier flagship smartphone."
+    options: [buy_now, wait_for_upgrade, decline]
+    price: 5499.0
+    currency: AED
+    context:
+      purchase_type: one_time
+      device_tier: flagship
+    tags: [electronics, one_time_purchase]
+
+  - scenario_id: ev_purchase
+    scenario_version: v1
+    category: consumer
+    question: "Would you consider buying an electric vehicle at AED 250,000?"
+    description: "Purchase of a mid-size electric vehicle, including home charging setup."
+    options: [buy, consider_more, decline]
+    price: 250000.0
+    currency: AED
+    context:
+      purchase_type: one_time
+      includes: home_charger
+    tags: [automotive, ev, high_involvement]
+
+  - scenario_id: travel_subscription
+    scenario_version: v1
+    category: consumer
+    question: "Would you subscribe to a travel membership at AED 999 per year (discounted flights and hotels)?"
+    description: "Annual travel membership bundling discounted flights and hotel stays."
+    options: [subscribe, maybe, decline]
+    price: 999.0
+    currency: AED
+    context:
+      frequency: annual
+      benefits: [flight_discounts, hotel_discounts]
+    tags: [subscription, travel, recurring]
+
+  - scenario_id: streaming_service
+    scenario_version: v1
+    category: consumer
+    question: "Would you subscribe to a premium streaming service at AED 39 per month?"
+    description: "Monthly subscription to a premium video streaming platform."
+    options: [subscribe, maybe, decline]
+    price: 39.0
+    currency: AED
+    context:
+      frequency: monthly
+      content: [film, series, originals]
+    tags: [subscription, entertainment, recurring]

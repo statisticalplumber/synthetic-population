@@ -1,0 +1,57 @@
+# =============================================================================
+# Model role configuration (data-plane model selection).
+#
+# Roles (sol / terra / luna) are abstractions; the concrete provider+model is
+# configurable here and overridable via environment variables.
+#
+# SECURITY: no API keys in this file. Keys are read from env vars named by
+# `api_key_env` (default OPENAI_API_KEY). Local servers (LM Studio,
+# llama-server, vLLM) usually need no key.
+# =============================================================================
+roles:
+  # Strong reasoning: architecture, evaluation design, audits, hard cases.
+  sol:
+    provider: openai_compatible
+    base_url_env: SOL_BASE_URL
+    default_base_url: http://127.0.0.1:1234/v1   # LM Studio default
+    model_env: SOL_MODEL
+    default_model: sol
+    api_key_env: SOL_API_KEY
+    temperature: 0.2
+    max_tokens: 4096
+    timeout_s: 300
+
+  # Medium: validation, consistency checks, quality scoring, repair.
+  terra:
+    provider: openai_compatible
+    base_url_env: TERRA_BASE_URL
+    default_base_url: http://127.0.0.1:1234/v1
+    model_env: TERRA_MODEL
+    default_model: terra
+    api_key_env: TERRA_API_KEY
+    temperature: 0.2
+    max_tokens: 2048
+    timeout_s: 180
+
+  # High-volume: persona enrichment, scenario simulation.
+  luna:
+    provider: openai_compatible
+    base_url_env: LUNA_BASE_URL
+    default_base_url: http://127.0.0.1:1234/v1
+    model_env: LUNA_MODEL
+    default_model: luna
+    api_key_env: LUNA_API_KEY
+    temperature: 0.3
+    max_tokens: 2048
+    timeout_s: 180
+
+  # Offline deterministic provider for development/tests (no API calls).
+  mock:
+    provider: mock
+
+# USD per 1k tokens, used by cost accounting. Adjust to your actual pricing.
+pricing_usd_per_1k:
+  sol:   {prompt: 0.015, completion: 0.060}
+  terra: {prompt: 0.005, completion: 0.020}
+  luna:  {prompt: 0.001, completion: 0.004}
+  mock:  {prompt: 0.0,   completion: 0.0}

@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "simulation.schema.json",
+  "$defs": {
+    "SimulationProvenance": {
+      "additionalProperties": false,
+      "description": "Provenance for a behavioral simulation record (Layer 3).",
+      "properties": {
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "simulator_prompt_version": {
+          "title": "Simulator Prompt Version",
+          "type": "string"
+        },
+        "scenario_id": {
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "scenario_version": {
+          "title": "Scenario Version",
+          "type": "string"
+        },
+        "persona_version": {
+          "title": "Persona Version",
+          "type": "string"
+        },
+        "model_params": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Model Params",
+          "type": "object"
+        },
+        "seed": {
+          "title": "Seed",
+          "type": "integer"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "data_label": {
+          "default": "synthetic_mock",
+          "enum": [
+            "synthetic_mock",
+            "synthetic_real_stats",
+            "real"
+          ],
+          "title": "Data Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "simulator_prompt_version",
+        "scenario_id",
+        "scenario_version",
+        "persona_version",
+        "seed"
+      ],
+      "title": "SimulationProvenance",
+      "type": "object"
+    },
+    "SimulationResult": {
+      "additionalProperties": false,
+      "description": "Probabilistic behavioral outcome for one (persona, scenario) pair.",
+      "properties": {
+        "persona_id": {
+          "title": "Persona Id",
+          "type": "string"
+        },
+        "scenario_id": {
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "scenario_version": {
+          "title": "Scenario Version",
+          "type": "string"
+        },
+        "choice": {
+          "title": "Choice",
+          "type": "string"
+        },
+        "probabilities": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "minProperties": 2,
+          "title": "Probabilities",
+          "type": "object"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "behavioral_factors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Behavioral Factors",
+          "type": "array"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SimulationProvenance"
+        }
+      },
+      "required": [
+        "persona_id",
+        "scenario_id",
+        "scenario_version",
+        "choice",
+        "probabilities",
+        "confidence",
+        "provenance"
+      ],
+      "title": "SimulationResult",
+      "type": "object"
+    },
+    "EnsemblePrediction": {
+      "additionalProperties": false,
+      "description": "Multi-model simulation output with disagreement score.\n\n`model_disagreement` = std-dev of per-model probabilities for the chosen\noption. High disagreement => uncertain record; do NOT read agreement as\nground-truth human behavior.",
+      "properties": {
+        "persona_id": {
+          "title": "Persona Id",
+          "type": "string"
+        },
+        "scenario_id": {
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "scenario_version": {
+          "title": "Scenario Version",
+          "type": "string"
+        },
+        "choice": {
+          "title": "Choice",
+          "type": "string"
+        },
+        "predictions": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Predictions",
+          "type": "object"
+        },
+        "ensemble_probability": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Ensemble Probability",
+          "type": "number"
+        },
+        "model_disagreement": {
+          "minimum": 0.0,
+          "title": "Model Disagreement",
+          "type": "number"
+        }
+      },
+      "required": [
+        "persona_id",
+        "scenario_id",
+        "scenario_version",
+        "choice",
+        "predictions",
+        "ensemble_probability",
+        "model_disagreement"
+      ],
+      "title": "EnsemblePrediction",
+      "type": "object"
+    }
+  }
+}

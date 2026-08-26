@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.eggs/
+.pytest_cache/
+.venv/
+.env
+data/raw/*
+data/intermediate/*
+data/generated/*
+data/validated/*
+data/reports/*
+data/experiments/*
+!data/*/.gitkeep
+*.duckdb
+.DS_Store

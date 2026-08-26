@@ -1,0 +1,24 @@
+# Pipeline / generation settings.
+
+population:
+  config: config/populations/uae_mock.yaml
+  n: 1000            # sample size (overrides config sample_size for this run)
+  seed: null         # null => use seed from population config
+
+enrichment:
+  role: mock         # mock | luna | terra | sol  (see config/models.yaml)
+  max_retries: 3
+
+distribution_checks:
+  # pass/fail = chi-squared goodness-of-fit vs target (sample-size aware)
+  alpha: 0.01
+  min_expected_count: 5   # chi-squared validity condition
+  min_parent_count: 30    # conditional cells below this are 'insufficient_data'
+
+storage:
+  data_root: data
+  partition_by: [country]
+
+budgets:
+  max_requests: 100000
+  max_estimated_cost_usd: 100.0

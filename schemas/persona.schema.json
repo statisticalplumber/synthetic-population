@@ -1,0 +1,423 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "persona.schema.json",
+  "$defs": {
+    "GenerationMetadata": {
+      "additionalProperties": false,
+      "description": "Provenance for a single generated record (skeleton or enriched persona).",
+      "properties": {
+        "pipeline_stage": {
+          "enum": [
+            "skeleton",
+            "persona",
+            "simulation",
+            "enrichment"
+          ],
+          "title": "Pipeline Stage",
+          "type": "string"
+        },
+        "provider": {
+          "default": "deterministic_sampler",
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "prompt_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Version"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "population_config_version": {
+          "title": "Population Config Version",
+          "type": "string"
+        },
+        "seed": {
+          "title": "Seed",
+          "type": "integer"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "data_label": {
+          "default": "synthetic_mock",
+          "enum": [
+            "synthetic_mock",
+            "synthetic_real_stats",
+            "real"
+          ],
+          "title": "Data Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pipeline_stage",
+        "population_config_version",
+        "seed"
+      ],
+      "title": "GenerationMetadata",
+      "type": "object"
+    },
+    "LatentAttributes": {
+      "additionalProperties": false,
+      "description": "Layer 2: latent behavioral variables, normalized to [0, 1].",
+      "properties": {
+        "price_sensitivity": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Price Sensitivity",
+          "type": "number"
+        },
+        "risk_tolerance": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Risk Tolerance",
+          "type": "number"
+        },
+        "brand_loyalty": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Brand Loyalty",
+          "type": "number"
+        },
+        "technology_affinity": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Technology Affinity",
+          "type": "number"
+        },
+        "novelty_seeking": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Novelty Seeking",
+          "type": "number"
+        },
+        "social_influence_sensitivity": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Social Influence Sensitivity",
+          "type": "number"
+        },
+        "convenience_preference": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Convenience Preference",
+          "type": "number"
+        },
+        "environmental_concern": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Environmental Concern",
+          "type": "number"
+        },
+        "status_orientation": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Status Orientation",
+          "type": "number"
+        },
+        "financial_conservatism": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Financial Conservatism",
+          "type": "number"
+        },
+        "impulsivity": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Impulsivity",
+          "type": "number"
+        },
+        "trust_propensity": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Trust Propensity",
+          "type": "number"
+        }
+      },
+      "required": [
+        "price_sensitivity",
+        "risk_tolerance",
+        "brand_loyalty",
+        "technology_affinity",
+        "novelty_seeking",
+        "social_influence_sensitivity",
+        "convenience_preference",
+        "environmental_concern",
+        "status_orientation",
+        "financial_conservatism",
+        "impulsivity",
+        "trust_propensity"
+      ],
+      "title": "LatentAttributes",
+      "type": "object"
+    },
+    "Persona": {
+      "additionalProperties": false,
+      "description": "Full persona: immutable demographics + latent attributes + provenance.",
+      "properties": {
+        "persona_id": {
+          "title": "Persona Id",
+          "type": "string"
+        },
+        "country": {
+          "title": "Country",
+          "type": "string"
+        },
+        "emirate": {
+          "title": "Emirate",
+          "type": "string"
+        },
+        "city": {
+          "title": "City",
+          "type": "string"
+        },
+        "urban_rural": {
+          "enum": [
+            "urban",
+            "rural"
+          ],
+          "title": "Urban Rural",
+          "type": "string"
+        },
+        "age": {
+          "maximum": 80,
+          "minimum": 18,
+          "title": "Age",
+          "type": "integer"
+        },
+        "age_band": {
+          "title": "Age Band",
+          "type": "string"
+        },
+        "gender": {
+          "enum": [
+            "female",
+            "male"
+          ],
+          "title": "Gender",
+          "type": "string"
+        },
+        "marital_status": {
+          "title": "Marital Status",
+          "type": "string"
+        },
+        "education": {
+          "title": "Education",
+          "type": "string"
+        },
+        "employment_status": {
+          "title": "Employment Status",
+          "type": "string"
+        },
+        "occupation_group": {
+          "title": "Occupation Group",
+          "type": "string"
+        },
+        "income_band": {
+          "title": "Income Band",
+          "type": "string"
+        },
+        "household_size": {
+          "maximum": 15,
+          "minimum": 1,
+          "title": "Household Size",
+          "type": "integer"
+        },
+        "housing_status": {
+          "title": "Housing Status",
+          "type": "string"
+        },
+        "data_label": {
+          "default": "synthetic_mock",
+          "enum": [
+            "synthetic_mock",
+            "synthetic_real_stats",
+            "real"
+          ],
+          "title": "Data Label",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/GenerationMetadata"
+        },
+        "latent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LatentAttributes"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "enrichment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GenerationMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "persona_id",
+        "country",
+        "emirate",
+        "city",
+        "urban_rural",
+        "age",
+        "age_band",
+        "gender",
+        "marital_status",
+        "education",
+        "employment_status",
+        "occupation_group",
+        "income_band",
+        "household_size",
+        "housing_status",
+        "provenance"
+      ],
+      "title": "Persona",
+      "type": "object"
+    },
+    "PersonaSkeleton": {
+      "additionalProperties": false,
+      "description": "Layer 1: observable demographic variables (statistically sampled).",
+      "properties": {
+        "persona_id": {
+          "title": "Persona Id",
+          "type": "string"
+        },
+        "country": {
+          "title": "Country",
+          "type": "string"
+        },
+        "emirate": {
+          "title": "Emirate",
+          "type": "string"
+        },
+        "city": {
+          "title": "City",
+          "type": "string"
+        },
+        "urban_rural": {
+          "enum": [
+            "urban",
+            "rural"
+          ],
+          "title": "Urban Rural",
+          "type": "string"
+        },
+        "age": {
+          "maximum": 80,
+          "minimum": 18,
+          "title": "Age",
+          "type": "integer"
+        },
+        "age_band": {
+          "title": "Age Band",
+          "type": "string"
+        },
+        "gender": {
+          "enum": [
+            "female",
+            "male"
+          ],
+          "title": "Gender",
+          "type": "string"
+        },
+        "marital_status": {
+          "title": "Marital Status",
+          "type": "string"
+        },
+        "education": {
+          "title": "Education",
+          "type": "string"
+        },
+        "employment_status": {
+          "title": "Employment Status",
+          "type": "string"
+        },
+        "occupation_group": {
+          "title": "Occupation Group",
+          "type": "string"
+        },
+        "income_band": {
+          "title": "Income Band",
+          "type": "string"
+        },
+        "household_size": {
+          "maximum": 15,
+          "minimum": 1,
+          "title": "Household Size",
+          "type": "integer"
+        },
+        "housing_status": {
+          "title": "Housing Status",
+          "type": "string"
+        },
+        "data_label": {
+          "default": "synthetic_mock",
+          "enum": [
+            "synthetic_mock",
+            "synthetic_real_stats",
+            "real"
+          ],
+          "title": "Data Label",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/GenerationMetadata"
+        }
+      },
+      "required": [
+        "persona_id",
+        "country",
+        "emirate",
+        "city",
+        "urban_rural",
+        "age",
+        "age_band",
+        "gender",
+        "marital_status",
+        "education",
+        "employment_status",
+        "occupation_group",
+        "income_band",
+        "household_size",
+        "housing_status",
+        "provenance"
+      ],
+      "title": "PersonaSkeleton",
+      "type": "object"
+    }
+  }
+}

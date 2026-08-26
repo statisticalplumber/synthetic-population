@@ -1,0 +1,223 @@
+# =============================================================================
+# MOCK population distribution — UAE (development only)
+#
+# data_label: synthetic_mock
+# These are HAND-PICKED, ILLUSTRATIVE probabilities for pipeline development.
+# They are NOT real census/statistics and must not be cited as such.
+# Replace with a real, sourced distribution (and set data_label accordingly)
+# before any downstream use.
+# =============================================================================
+config_version: uae_mock_v1
+country: UAE
+country_code: AE
+data_label: synthetic_mock
+source_note: >
+  MOCK distribution for pipeline development. Hand-picked plausible values;
+  no real census or survey source. Do not present as real population statistics.
+sample_size: 1000
+seed: 42
+
+variables:
+  # --- geography -----------------------------------------------------------
+  - name: emirate
+    type: categorical
+    categories: [Dubai, "Abu Dhabi", Sharjah, Ajman, "Ras Al Khaimah", Fujairah, "Umm Al Quwain"]
+    probabilities: [0.42, 0.28, 0.14, 0.05, 0.05, 0.04, 0.02]
+
+  - name: city
+    type: conditional
+    categories:
+      [Dubai City, Al Barsha, Jumeirah, Deira, Other Dubai,
+       "Abu Dhabi City", Al Ain, Other Abu Dhabi,
+       Sharjah City, Kalba, Other Sharjah,
+       Ajman City, Other Ajman,
+       "Ras Al Khaimah City", Other RAK,
+       Fujairah City, Other Fujairah,
+       "Umm Al Quwain City", Other UAQ]
+    rules:
+      - when: {emirate: [Dubai]}
+        distribution: {"Dubai City": 0.50, "Al Barsha": 0.15, Jumeirah: 0.10, Deira: 0.10, "Other Dubai": 0.15}
+      - when: {emirate: ["Abu Dhabi"]}
+        distribution: {"Abu Dhabi City": 0.55, "Al Ain": 0.25, "Other Abu Dhabi": 0.20}
+      - when: {emirate: [Sharjah]}
+        distribution: {"Sharjah City": 0.70, Kalba: 0.15, "Other Sharjah": 0.15}
+      - when: {emirate: [Ajman]}
+        distribution: {"Ajman City": 0.80, "Other Ajman": 0.20}
+      - when: {emirate: ["Ras Al Khaimah"]}
+        distribution: {"Ras Al Khaimah City": 0.80, "Other RAK": 0.20}
+      - when: {emirate: [Fujairah]}
+        distribution: {Fujairah City: 0.80, "Other Fujairah": 0.20}
+      - when: {emirate: ["Umm Al Quwain"]}
+        distribution: {"Umm Al Quwain City": 0.80, "Other UAQ": 0.20}
+    default: {"Other Dubai": 0.20, "Other Abu Dhabi": 0.20, "Other Sharjah": 0.20, "Other Ajman": 0.10, "Other RAK": 0.10, "Other Fujairah": 0.10, "Other UAQ": 0.10}
+
+  - name: urban_rural
+    type: conditional
+    categories: [urban, rural]
+    rules:
+      - when: {emirate: [Dubai, "Abu Dhabi", Sharjah, Ajman]}
+        distribution: {urban: 0.96, rural: 0.04}
+      - when: {emirate: ["Ras Al Khaimah", Fujairah, "Umm Al Quwain"]}
+        distribution: {urban: 0.85, rural: 0.15}
+    default: {urban: 0.90, rural: 0.10}
+
+  # --- demographics ---------------------------------------------------------
+  - name: gender
+    type: categorical
+    categories: [female, male]
+    probabilities: [0.48, 0.52]
+
+  - name: age
+    type: age_mixture
+    bands:
+      - {lo: 18, hi: 24, weight: 0.12}
+      - {lo: 25, hi: 34, weight: 0.30}
+      - {lo: 35, hi: 44, weight: 0.25}
+      - {lo: 45, hi: 54, weight: 0.15}
+      - {lo: 55, hi: 64, weight: 0.10}
+      - {lo: 65, hi: 74, weight: 0.05}
+      - {lo: 75, hi: 80, weight: 0.03}
+
+  - name: marital_status
+    type: conditional
+    categories: [single, married, divorced, widowed]
+    rules:
+      - when: {age_band: ["18-24"]}
+        distribution: {single: 0.85, married: 0.12, divorced: 0.02, widowed: 0.01}
+      - when: {age_band: ["25-34"]}
+        distribution: {single: 0.35, married: 0.60, divorced: 0.04, widowed: 0.01}
+      - when: {age_band: ["35-44"]}
+        distribution: {single: 0.15, married: 0.78, divorced: 0.05, widowed: 0.02}
+      - when: {age_band: ["45-54"]}
+        distribution: {single: 0.10, married: 0.75, divorced: 0.10, widowed: 0.05}
+      - when: {age_band: ["55-64"]}
+        distribution: {single: 0.08, married: 0.62, divorced: 0.15, widowed: 0.15}
+      - when: {age_band: ["65-74"]}
+        distribution: {single: 0.05, married: 0.45, divorced: 0.15, widowed: 0.35}
+      - when: {age_band: ["75-80"]}
+        distribution: {single: 0.05, married: 0.30, divorced: 0.10, widowed: 0.55}
+    default: {single: 0.25, married: 0.50, divorced: 0.15, widowed: 0.10}
+
+  - name: education
+    type: conditional
+    categories: [primary, secondary, higher_secondary, bachelors, masters, doctors]
+    rules:
+      - when: {age_band: ["18-24"]}
+        distribution: {primary: 0.02, secondary: 0.28, higher_secondary: 0.15, bachelors: 0.45, masters: 0.08, doctors: 0.02}
+      - when: {age_band: ["25-34"]}
+        distribution: {primary: 0.05, secondary: 0.25, higher_secondary: 0.12, bachelors: 0.42, masters: 0.12, doctors: 0.04}
+      - when: {age_band: ["35-44"]}
+        distribution: {primary: 0.08, secondary: 0.27, higher_secondary: 0.12, bachelors: 0.38, masters: 0.11, doctors: 0.04}
+      - when: {age_band: ["45-54"]}
+        distribution: {primary: 0.12, secondary: 0.30, higher_secondary: 0.14, bachelors: 0.31, masters: 0.09, doctors: 0.04}
+      - when: {age_band: ["55-64"]}
+        distribution: {primary: 0.18, secondary: 0.34, higher_secondary: 0.15, bachelors: 0.24, masters: 0.07, doctors: 0.02}
+      - when: {age_band: ["65-74"]}
+        distribution: {primary: 0.25, secondary: 0.36, higher_secondary: 0.15, bachelors: 0.17, masters: 0.05, doctors: 0.02}
+      - when: {age_band: ["75-80"]}
+        distribution: {primary: 0.30, secondary: 0.36, higher_secondary: 0.14, bachelors: 0.15, masters: 0.04, doctors: 0.01}
+    default: {primary: 0.10, secondary: 0.30, higher_secondary: 0.15, bachelors: 0.30, masters: 0.10, doctors: 0.05}
+
+  - name: employment_status
+    type: conditional
+    categories: [employed, self_employed, unemployed, student, retired, not_in_labor_force]
+    rules:
+      - when: {age_band: ["18-24"]}
+        distribution: {employed: 0.33, self_employed: 0.02, unemployed: 0.15, student: 0.35, retired: 0.00, not_in_labor_force: 0.15}
+      - when: {age_band: ["25-34"]}
+        distribution: {employed: 0.58, self_employed: 0.04, unemployed: 0.08, student: 0.15, retired: 0.00, not_in_labor_force: 0.15}
+      - when: {age_band: ["35-44"]}
+        distribution: {employed: 0.70, self_employed: 0.05, unemployed: 0.05, student: 0.05, retired: 0.00, not_in_labor_force: 0.15}
+      - when: {age_band: ["45-54"]}
+        distribution: {employed: 0.66, self_employed: 0.06, unemployed: 0.04, student: 0.02, retired: 0.05, not_in_labor_force: 0.17}
+      - when: {age_band: ["55-64"]}
+        distribution: {employed: 0.48, self_employed: 0.07, unemployed: 0.03, student: 0.00, retired: 0.20, not_in_labor_force: 0.22}
+      - when: {age_band: ["65-74"]}
+        distribution: {employed: 0.22, self_employed: 0.03, unemployed: 0.02, student: 0.00, retired: 0.55, not_in_labor_force: 0.18}
+      - when: {age_band: ["75-80"]}
+        distribution: {employed: 0.09, self_employed: 0.01, unemployed: 0.01, student: 0.00, retired: 0.62, not_in_labor_force: 0.27}
+    default: {employed: 0.45, self_employed: 0.05, unemployed: 0.05, student: 0.05, retired: 0.15, not_in_labor_force: 0.25}
+
+  - name: occupation_group
+    type: conditional
+    categories:
+      [management, professional, technical, clerical, service, sales,
+       trades, agriculture, self_employed, student, retired, not_applicable]
+    rules:
+      # employment status gates occupation first (rules are ordered, first match wins)
+      - when: {employment_status: [student]}
+        distribution: {student: 1.0}
+      - when: {employment_status: [retired]}
+        distribution: {retired: 1.0}
+      - when: {employment_status: [not_in_labor_force, unemployed]}
+        distribution: {not_applicable: 1.0}
+      - when: {employment_status: [self_employed]}
+        distribution: {self_employed: 0.70, management: 0.10, sales: 0.10, trades: 0.10}
+      # then by education (employed / self-employed-with-other-occ rows)
+      - when: {education: [primary]}
+        distribution: {trades: 0.45, service: 0.35, sales: 0.10, agriculture: 0.10}
+      - when: {education: [secondary]}
+        distribution: {trades: 0.30, service: 0.30, clerical: 0.15, sales: 0.15, technical: 0.10}
+      - when: {education: [higher_secondary]}
+        distribution: {clerical: 0.25, service: 0.20, sales: 0.20, trades: 0.15, technical: 0.10, management: 0.10}
+      - when: {education: [bachelors]}
+        distribution: {professional: 0.45, management: 0.15, clerical: 0.15, technical: 0.15, sales: 0.10}
+      - when: {education: [masters]}
+        distribution: {professional: 0.40, management: 0.25, technical: 0.15, clerical: 0.10, sales: 0.10}
+      - when: {education: [doctors]}
+        distribution: {professional: 0.45, management: 0.25, technical: 0.20, sales: 0.05, clerical: 0.05}
+    default: {service: 0.40, trades: 0.25, sales: 0.15, clerical: 0.20}
+
+  - name: income_band
+    type: conditional
+    categories: [low, lower_middle, middle, upper_middle, high]
+    rules:
+      # students / non-working have lower income
+      - when: {employment_status: [student, not_in_labor_force]}
+        distribution: {low: 0.55, lower_middle: 0.30, middle: 0.10, upper_middle: 0.04, high: 0.01}
+      - when: {employment_status: [retired]}
+        distribution: {low: 0.25, lower_middle: 0.35, middle: 0.28, upper_middle: 0.09, high: 0.03}
+      # otherwise driven by education (mock simplification)
+      - when: {education: [primary]}
+        distribution: {low: 0.45, lower_middle: 0.35, middle: 0.15, upper_middle: 0.03, high: 0.02}
+      - when: {education: [secondary]}
+        distribution: {low: 0.30, lower_middle: 0.40, middle: 0.20, upper_middle: 0.07, high: 0.03}
+      - when: {education: [higher_secondary]}
+        distribution: {low: 0.20, lower_middle: 0.38, middle: 0.28, upper_middle: 0.10, high: 0.04}
+      - when: {education: [bachelors]}
+        distribution: {low: 0.08, lower_middle: 0.25, middle: 0.38, upper_middle: 0.20, high: 0.09}
+      - when: {education: [masters]}
+        distribution: {low: 0.04, lower_middle: 0.15, middle: 0.35, upper_middle: 0.30, high: 0.16}
+      - when: {education: [doctors]}
+        distribution: {low: 0.02, lower_middle: 0.08, middle: 0.30, upper_middle: 0.35, high: 0.25}
+    default: {low: 0.20, lower_middle: 0.35, middle: 0.30, upper_middle: 0.10, high: 0.05}
+
+  - name: household_size
+    type: conditional
+    categories: [1, 2, 3, 4, 5, 6]
+    rules:
+      - when: {marital_status: [single]}
+        distribution: {1: 0.55, 2: 0.25, 3: 0.10, 4: 0.05, 5: 0.03, 6: 0.02}
+      - when: {marital_status: [married]}
+        distribution: {1: 0.05, 2: 0.30, 3: 0.28, 4: 0.20, 5: 0.10, 6: 0.07}
+      - when: {marital_status: [divorced]}
+        distribution: {1: 0.35, 2: 0.30, 3: 0.18, 4: 0.10, 5: 0.05, 6: 0.02}
+      - when: {marital_status: [widowed]}
+        distribution: {1: 0.45, 2: 0.28, 3: 0.14, 4: 0.08, 5: 0.03, 6: 0.02}
+    default: {1: 0.25, 2: 0.30, 3: 0.22, 4: 0.13, 5: 0.06, 6: 0.04}
+
+  - name: housing_status
+    type: conditional
+    categories: [rent, owned, with_family, other]
+    rules:
+      - when: {income_band: [low]}
+        distribution: {rent: 0.75, owned: 0.10, with_family: 0.10, other: 0.05}
+      - when: {income_band: [lower_middle]}
+        distribution: {rent: 0.55, owned: 0.20, with_family: 0.18, other: 0.07}
+      - when: {income_band: [middle]}
+        distribution: {rent: 0.40, owned: 0.35, with_family: 0.18, other: 0.07}
+      - when: {income_band: [upper_middle]}
+        distribution: {rent: 0.25, owned: 0.55, with_family: 0.15, other: 0.05}
+      - when: {income_band: [high]}
+        distribution: {rent: 0.15, owned: 0.70, with_family: 0.10, other: 0.05}
+    default: {rent: 0.45, owned: 0.30, with_family: 0.18, other: 0.07}

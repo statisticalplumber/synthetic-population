@@ -106,10 +106,11 @@ Outputs land in `data/generated/...` and `data/reports/<run_id>/`:
 
 ## Real LLM smoke test (verified)
 
-Tested against a llama-server 12B GGUF via a gradio.live tunnel:
+Tested against a local model served by llama-server on port 8080
+(LM Studio on port 1234 works the same way):
 
 ```bash
-LUNA_BASE_URL=https://<tunnel>.gradio.live/v1 \
+LUNA_BASE_URL=http://127.0.0.1:8080/v1 \
 LUNA_MODEL='<served-model-path>' \
 python scripts/test_provider.py --role luna --n 50 --out data/experiments/luna_smoke50/personas.jsonl
 ```
